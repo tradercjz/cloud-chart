@@ -1,0 +1,49 @@
+---
+# DolphinDB 只允许同用户的 CodeServer 访问
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dolphindb-{{ .Values.userId }}-isolation
+spec:
+  podSelector:
+    matchLabels:
+      app: dolphindb-{{ .Values.userId }}
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: codeserver-{{ .Values.userId }}
+    ports:
+    - protocol: TCP
+      port: {{ .Values.dolphindb.port }}
+---
+# CodeServer 出站流量控制
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: codeserver-{{ .Values.userId }}-egress
+spec:
+  podSelector:
+    matchLabels:
+      app: codeserver-{{ .Values.userId }}
+  policyTypes:
+  - Egress
+  egress:
+  # 允许访问自己的 DolphinDB
+  - to:
+    - podSelector:
+        matchLabels:
+          app: dolphindb-{{ .Values.userId }}
+    ports:
+    - protocol: TCP
+      port: {{ .Values.dolphindb.port }}
+  # 允许 DNS 查询
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53

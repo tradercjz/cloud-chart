@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: dolphindb-user001
+spec:
+  serviceName: dolphindb-user001
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dolphindb-user001
+  template:
+    metadata:
+      labels:
+        app: dolphindb-user001
+    spec:
+      containers:
+      - name: dolphindb
+        image: registry.cn-hangzhou.aliyuncs.com/dolphindbit/dolphindb:v3.00.3
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8848
+        env:
+        - name: DDB_USER
+          value: "admin"
+        - name: DDB_PASS
+          value: "123456"
+        volumeMounts:
+        - name: dolphindb-data
+          mountPath: /opt/dolphindb/data
+  volumeClaimTemplates:
+  - metadata:
+      name: dolphindb-data
+    spec:
+      storageClassName: local-path
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 10Gi

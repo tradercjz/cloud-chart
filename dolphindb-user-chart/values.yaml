@@ -1,0 +1,31 @@
+userId: "user001"
+
+dolphindb:
+  image: registry.cn-hangzhou.aliyuncs.com/dolphindbit/dolphindb:v3.00.3
+  port: 8848
+  username: admin
+  password: "123456"
+  storage: 10Gi
+  storageClass: local-path
+
+codeserver:
+  image: codeserver-ddb:latest
+  port: 3000
+  password: "userpassword"
+
+# 资源限制
+resources:
+  dolphindb:
+    requests:
+      memory: "2Gi"
+      cpu: "1000m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+  codeserver:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"

@@ -1,0 +1,12 @@
+apiVersion: v2
+name: dolphindb-user-chart
+description: A Helm chart for DolphinDB user workspace
+type: application
+version: 1.0.0
+appVersion: "3.00.3"
+keywords:
+  - dolphindb
+  - codeserver
+  - workspace
+maintainers:
+  - name: Jinzhi Chen

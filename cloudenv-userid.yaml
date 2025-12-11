@@ -1,0 +1,148 @@
+# =========================
+# DolphinDB StatefulSet + Service
+# =========================
+apiVersion: v1
+kind: Service
+metadata:
+  name: dolphindb-user001
+spec:
+  type: ClusterIP    
+  selector:
+    app: dolphindb-user001
+  ports:
+    - name: api
+      port: 8848
+      targetPort: 8848
+      protocol: TCP   
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: dolphindb-user001
+spec:
+  serviceName: dolphindb-user001
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dolphindb-user001
+  template:
+    metadata:
+      labels:
+        app: dolphindb-user001
+    spec:
+      containers:
+      - name: dolphindb
+        image: registry.cn-hangzhou.aliyuncs.com/dolphindbit/dolphindb:v3.00.3
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8848
+        env:
+        - name: DDB_USER
+          value: "admin"
+        - name: DDB_PASS
+          value: "123456"
+        volumeMounts:
+        - name: dolphindb-data
+          mountPath: /opt/dolphindb/data
+  volumeClaimTemplates:
+  - metadata:
+      name: dolphindb-data
+    spec:
+      storageClassName: local-path
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 10Gi
+---
+# =========================
+# code-server Deployment + Service
+# =========================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: codeserver-user001
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: codeserver-user001
+  template:
+    metadata:
+      labels:
+        app: codeserver-user001
+    spec:
+      securityContext:
+        fsGroup: 1000
+      initContainers:
+        - name: init-settings
+          image: busybox
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c"]
+          args:
+            - |
+              mkdir -p /config
+              cat > /config/settings.json <<EOF
+              {
+                "dolphindb.connections": [
+                  {
+                    "name": "localDDB",
+                    "url": "ws://dolphindb-user001:8848",
+                    "autologin": true,
+                    "username": "admin",
+                    "password": "123456"
+                  }
+                ],
+                "extensions.autoUpdate": false,
+                "extensions.autoCheckUpdates": false,
+                "telemetry.telemetryLevel": "off",
+                "workbench.enableExperiments": false
+              }
+              EOF
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config
+        - name: fix-perms
+          image: codeserver-ddb:latest
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c"]
+          args:
+            - |
+              # determine coder UID:GID from the app image and apply to the file
+              uid=$(awk -F: '/^coder:/{print $3; exit}' /etc/passwd 2>/dev/null || echo 0)
+              gid=$(awk -F: '/^coder:/{print $4; exit}' /etc/passwd 2>/dev/null || echo 0)
+              if [ -f /config/settings.json ]; then
+                chown ${uid}:${gid} /config/settings.json 2>/dev/null || true
+                chmod 0644 /config/settings.json 2>/dev/null || true
+              fi
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config
+      containers:
+      - name: code-server
+        image: codeserver-ddb:latest
+        imagePullPolicy: IfNotPresent
+        env:
+          - name: PASSWORD
+            value: "userpassword"
+        ports:
+          - containerPort: 3000
+        volumeMounts:
+          - name: config-volume
+            mountPath: /home/coder/.local/share/code-server/Machine/settings.json
+            subPath: settings.json
+      volumes:
+      - name: config-volume
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: codeserver-user001
+spec:
+  type: NodePort
+  selector:
+    app: codeserver-user001
+  ports:
+    - port: 3000
+      targetPort: 3000 
+
