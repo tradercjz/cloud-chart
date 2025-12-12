@@ -127,9 +127,24 @@ spec:
       - name: code-server
         image: {{ .Values.codeserver.image }}
         imagePullPolicy: IfNotPresent
+        command: ["/bin/bash", "-c"]
+        
+        args:
+          - |
+            set -e
+            chown -R coder:coder /home/coder /workspace || true
+            exec gosu coder code-server \
+              --bind-addr 0.0.0.0:{{ .Values.codeserver.port }} \
+              --auth none \
+              --disable-telemetry \
+              --disable-update-check \
+              --proxy-domain codeserver.dolphindb.cloud \
+              /workspace
         env:
           - name: PASSWORD
             value: {{ .Values.codeserver.password | quote }}
+          - name: VSCODE_PROXY_URI
+            value: "https://codeserver.dolphindb.cloud/{{ .Values.userId }}"
         ports:
           - containerPort: {{ .Values.codeserver.port }}
         volumeMounts:

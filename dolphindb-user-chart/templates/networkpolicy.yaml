@@ -23,13 +23,25 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: codeserver-{{ .Values.userId }}-egress
+  name: codeserver-{{ .Values.userId }}-netpol
 spec:
   podSelector:
     matchLabels:
       app: codeserver-{{ .Values.userId }}
   policyTypes:
+  - Ingress
   - Egress
+  
+  # === [新增] 入站规则 (Ingress) ===
+  # 必须允许外部流量访问 CodeServer 的端口，否则 Ingress Controller 无法连接
+  ingress:
+  - ports:
+    - protocol: TCP
+      port: {{ .Values.codeserver.port }}
+  # 注意：这里没有写 'from'，表示允许任何 Pod (包括 Ingress Controller) 访问此端口。
+  # 这是修复 113/502 错误的关键。
+
+  # === [保持] 出站规则 (Egress) ===
   egress:
   # 允许访问自己的 DolphinDB
   - to:
@@ -39,11 +51,14 @@ spec:
     ports:
     - protocol: TCP
       port: {{ .Values.dolphindb.port }}
-  # 允许 DNS 查询
+  
+  # 允许 DNS 查询 (建议同时开启 UDP 和 TCP，防止大包查询失败)
   - to:
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: kube-system
     ports:
     - protocol: UDP
+      port: 53
+    - protocol: TCP
       port: 53

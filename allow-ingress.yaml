@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: codeserver-user004-allow-ingress
+  namespace: default  # 请确认你的 pod 在哪个 namespace，如果是 default 就写 default
+spec:
+  podSelector:
+    matchLabels:
+      app: codeserver-user004
+  policyTypes:
+  - Ingress
+  ingress:
+  - from: [] # 空列表意味着“允许所有来源”，这用于排除故障
+    ports:
+    - protocol: TCP
+      port: 3000
