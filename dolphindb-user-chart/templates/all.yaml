@@ -144,7 +144,7 @@ spec:
           - name: PASSWORD
             value: {{ .Values.codeserver.password | quote }}
           - name: VSCODE_PROXY_URI
-            value: "https://codeserver.dolphindb.cloud/{{ .Values.userId }}"
+            value: "https://chat.dolphindb.cloud/code/{{ .Values.userId }}"
         ports:
           - containerPort: {{ .Values.codeserver.port }}
         volumeMounts:

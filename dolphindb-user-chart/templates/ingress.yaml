@@ -8,7 +8,7 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: /$2
     nginx.ingress.kubernetes.io/use-regex: "true"
 
-    nginx.ingress.kubernetes.io/x-forwarded-prefix: "/{{ .Values.userId }}"
+    nginx.ingress.kubernetes.io/x-forwarded-prefix: "/code/{{ .Values.userId }}"
 
     nginx.ingress.kubernetes.io/proxy-buffering: "off"
     nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
@@ -20,7 +20,7 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-set-header-connection: "upgrade"
 spec:
   rules:
-  - host: codeserver.dolphindb.cloud
+  - host: chat.dolphindb.cloud
     http:
       paths:
       - path: /{{ .Values.userId }}(/|$)(.*)
