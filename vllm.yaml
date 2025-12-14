@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qwen-vllm
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: qwen-vllm
+  template:
+    metadata:
+      labels:
+        app: qwen-vllm
+    spec:
+      runtimeClassName: nvidia
+      containers:
+      - name: vllm
+        image: vllm/vllm-openai:latest  # vLLM 官方镜像
+        imagePullPolicy: IfNotPresent
+        
+        # 启动命令 (对应你的命令行参数)
+        command: ["python3", "-m", "vllm.entrypoints.openai.api_server"]
+        args:
+        - "--model"
+        - "/ssd/ssd6/hfmodels/qwen3full"
+        - "--served-model-name"
+        - "qwen-local"
+        - "--port"
+        - "8000"
+        - "--gpu-memory-utilization"
+        - "0.95"
+        - "--dtype"
+        - "bfloat16"
+        - "--trust-remote-code"
+        - "--max-model-len"
+        - "131072"
+        - "--port"
+        - "9999"
+        
+        ports:
+        - containerPort: 9999
+        
+        # 🌟 关键点 1: 申请 GPU 资源
+        resources:
+          limits:
+            nvidia.com/gpu: 1  # 申请 1 张卡
+        
+        # 🌟 关键点 2: 挂载卷
+        volumeMounts:
+        - name: model-cache
+          mountPath: /ssd/ssd6/hfmodels/qwen3full # 容器内模型缓存路径
+        - name: dshm
+          mountPath: /dev/shm # 增加共享内存，vLLM/PyTorch 必须
+          
+      volumes:
+      # 挂载宿主机的模型缓存目录，避免重启 Pod 重复下载 30GB 模型
+      - name: model-cache
+        hostPath:
+          path: /ssd/ssd6/hfmodels/qwen3full  # 宿主机上原本存模型的地方
+          type: Directory
+      # 解决 PyTorch DataLoader 需要大量共享内存的问题
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 40Gi # 或者更大
+
+---
+# Service: 让集群内其他 Pod 能通过 DNS 访问
+apiVersion: v1
+kind: Service
+metadata:
+  name: qwen-service # DNS 名称
+  namespace: default
+spec:
+  ports:
+  - port: 9999
+    targetPort: 9999
+  selector:
+    app: qwen-vllm
