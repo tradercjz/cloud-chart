@@ -1,0 +1,85 @@
+# narwhal-hostnetwork.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: narwhal-sa
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: narwhal-admin-binding
+subjects:
+- kind: ServiceAccount
+  name: narwhal-sa
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: narwhal-backend
+  namespace: default
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: narwhal
+  template:
+    metadata:
+      labels:
+        app: narwhal
+    spec:
+      serviceAccountName: narwhal-sa
+      hostNetwork: true
+      dnsPolicy: Default
+      
+      containers:
+      - name: api
+        image: narwhal-backend:v4
+        imagePullPolicy: IfNotPresent
+        command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "20003", "--reload"]
+        
+        ports:
+        - containerPort: 20003
+        
+        env:
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: DATABASE_URL
+          value: "sqlite+aiosqlite:///./narwhal.db"
+        
+        volumeMounts:
+        - name: source-code
+          mountPath: /app
+        - name: vector-store-dir
+          mountPath: /mnt/ramdisk
+
+      volumes:
+      - name: source-code
+        hostPath:
+          path: /home/jzchen/Narwhal
+          type: Directory
+      - name: vector-store-dir
+        hostPath:
+          path: /mnt/ramdisk
+          type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: narwhal-service
+  namespace: default
+spec:
+  selector:
+    app: narwhal
+  ports:
+    - port: 20003
+      targetPort: 20003

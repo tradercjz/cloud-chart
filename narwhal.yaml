@@ -1,0 +1,98 @@
+# 1. ServiceAccount: 给 Pod 一个身份，用于操作 Helm/K8s API
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: narwhal-sa
+  namespace: default
+---
+# 2. ClusterRoleBinding: 赋予该身份管理员权限 (开发环境方便，生产建议细化)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: narwhal-admin-binding
+subjects:
+- kind: ServiceAccount
+  name: narwhal-sa
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+---
+# 3. Deployment: 核心应用定义
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: narwhal-backend
+  namespace: default
+spec:
+  replicas: 1 # ⚠️ DuckDB 必须单实例运行
+  strategy:
+    type: Recreate # ⚠️ 必须重建策略，防止新旧 Pod 同时持有文件锁
+  selector:
+    matchLabels:
+      app: narwhal
+  template:
+    metadata:
+      labels:
+        app: narwhal
+    spec:
+      serviceAccountName: narwhal-sa
+
+      # 🌟 方案1: 去掉 securityContext，以 root 运行（开发环境最简单）
+      # 如果你想保留安全性，见下方"方案2"
+      
+      containers:
+      - name: api
+        image: narwhal-backend:v2
+        imagePullPolicy: IfNotPresent
+        
+        command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+        
+        ports:
+        - containerPort: 8000
+        
+        env:
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: DATABASE_URL
+          value: "sqlite+aiosqlite:///./narwhal.db"
+        
+        volumeMounts:
+        # 1. 挂载源码
+        - name: source-code
+          mountPath: /app
+        
+        # 2. 🌟 挂载宿主机的 ramdisk 目录
+        - name: vector-store-dir
+          mountPath: /mnt/ramdisk
+
+      volumes:
+      # 源码路径
+      - name: source-code
+        hostPath:
+          path: /home/jzchen/Narwhal
+          type: Directory
+          
+      # 🌟 宿主机 ramdisk 路径
+      - name: vector-store-dir
+        hostPath:
+          path: /mnt/ramdisk
+          type: Directory
+---
+# 4. Service: 暴露端口
+apiVersion: v1
+kind: Service
+metadata:
+  name: narwhal-service
+  namespace: default
+spec:
+  type: NodePort
+  selector:
+    app: narwhal
+  ports:
+    - port: 8000
+      targetPort: 8000
+      nodePort: 30003
