@@ -18,6 +18,17 @@ spec:
     ports:
     - protocol: TCP
       port: {{ .Values.dolphindb.port }}
+  
+  - from:
+    # 1. 限制来源 Namespace
+    - namespaceSelector:
+        matchLabels:
+          # K8s 自动给 Namespace 打的标签，通常是 name=xxx
+          kubernetes.io/metadata.name: default 
+      # 2. 限制来源 Pod 
+      podSelector:
+        matchLabels:
+          app: narwhal-backend 
 ---
 # CodeServer 出站流量控制
 apiVersion: networking.k8s.io/v1
