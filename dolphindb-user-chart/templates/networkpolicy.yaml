@@ -63,6 +63,20 @@ spec:
     - protocol: TCP
       port: {{ .Values.dolphindb.port }}
   
+  #  2. 允许访问 narwhal-backend (使用端口 20003)
+  - to:
+    # 限制目标 Pod
+    - podSelector:
+        matchLabels:
+          app: narwhal-backend 
+    # 限制目标 Namespace 在 default 命名空间
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: default 
+    ports:
+    - protocol: TCP
+      port: 20003 
+  
   # 允许 DNS 查询 (建议同时开启 UDP 和 TCP，防止大包查询失败)
   - to:
     - namespaceSelector:
